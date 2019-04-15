@@ -1,0 +1,7 @@
+.idea
+.DS_Store
+*.pyc
+*.xml
+.ipynb_checkpoints
+venv
+__pycache__/
