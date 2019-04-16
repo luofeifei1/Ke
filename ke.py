@@ -24,6 +24,8 @@ class Ke:
         根据指定的爬取类型，获得正确的URL。贝壳网采用POST方式显示页面变化。
 
         要考虑整租/合租/公寓，省份，对话框关键字和依次的各项筛选条件。
+
+        TODO:1.将筛选条件打印在console里面
         :return:
         """
         # 目前爬取北京的全量租房
@@ -292,20 +294,28 @@ class Ke:
 
                 # 地址和交通
                 ##TODO:subway_line结构化优化：10号线 - 亮马桥，1号线,八通线 - 四惠，4号线大兴线 - 生物医药基地，s1线 - 上岸
-                list_subways = []
+                df_subways = pd.DataFrame(columns=['subway_line','subway_station','subway_station_distance'])
                 for i in driver.find_elements_by_xpath("//div[@class='content__article__info4']/ul/li"):
                     print(i.text)
-                    subway_line = i.find_element_by_xpath("//span[1]").text.split(' - ')[0]
+                    subway_line = i.text[3:].split(' - ')[0]
                     print(subway_line)
-                    subway_station = i.find_element_by_xpath("//span[1]").text.split(' - ')[1]
-                    subway_station_distance = int(i.find_element_by_xpath("//span[2]").text.split('m')[0])
-                    list_subways.append([subway_line, subway_station, subway_station_distance])
+                    subway_station = i.text.split(' - ')[1].split(' ')[0]
+                    print(subway_station)
+                    subway_station_distance = int(i.text.split(' - ')[1].split(' ')[1].split('m')[0])
+                    print(subway_station_distance)
+                    df_subways = df_subways.append({'subway_line':subway_line, 'subway_station':subway_station, 'subway_station_distance':subway_station_distance}, ignore_index=True)
+                dic_subways = df_subways.to_dict()
 
                 # 小区最新成交
-                complex_deals = driver.find_element_by_xpath("//div[@class='table']")
-                complex_deals = pd.read_html('<table>' + complex_deals.get_attribute('innerHTML') + '</table>')
-                complex_deals = complex_deals.to_dict()
-                print (complex_deals)
+                ##TODO：Debug line 310;read html table
+                try:
+                    complex_deals = driver.find_element_by_xpath("//div[@class='table']")
+                    print(complex_deals)
+                    complex_deals = pd.read_html('<table>' + complex_deals.get_attribute('innerHTML') + '</table>')
+                    print(complex_deals)
+                    complex_deals = complex_deals[0].to_dict()
+                except:
+                    complex_deals = ''
 
                 # 房源描述
                 ##TODO:检查有无超过一条描述的情况
@@ -329,7 +339,7 @@ class Ke:
                                           '最短租期':rent_peroid_lower,'最长租期':rent_peroid_upper,'所在楼层':house_floor,'总楼层':house_total_floor,
                                           '车位':parking,'用电':electricity_type,'入住':check_in,'看房':reservation,'电梯':lift,'用水':water,'燃气':gas,
                                           '电视':television, '冰箱':refrigerator,'洗衣机':washing_machine,'空调':air_conditioner,'热水器':water_heater,
-                                          '床':bed,'暖气':heating,'宽带':wifi,'衣柜':wardrobe,'天然气':natural_gas,'地址和交通':list_subways,
+                                          '床':bed,'暖气':heating,'宽带':wifi,'衣柜':wardrobe,'天然气':natural_gas,'地址和交通':dic_subways,
                                           '小区最新成交':complex_deals,'房源描述':house_description,'房源链接':house_url})
 
             return df_single
