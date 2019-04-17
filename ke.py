@@ -5,13 +5,10 @@
 
 __author__ = 'Qiao Zhang'
 
-import time
-import re
 import json
 import pandas as pd
-from bs4 import BeautifulSoup
 from selenium import webdriver
-from collections import deque, OrderedDict
+from collections import OrderedDict
 from tqdm import tqdm
 
 from utils import WriterJson
