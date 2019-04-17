@@ -1,6 +1,9 @@
 # Ke
 贝壳爬虫。
 
+## 入门
+请打开`test.ipynb`查看入门指南。
+
 ## 租房
 ```python
 dict_all = Ke().ke_scraper_rent(export='json')
