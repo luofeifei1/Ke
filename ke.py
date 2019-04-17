@@ -10,6 +10,7 @@ import json
 import codecs
 import pandas as pd
 from selenium import webdriver
+from bs4 import BeautifulSoup
 from collections import OrderedDict
 from tqdm import tqdm
 
@@ -340,7 +341,6 @@ class Ke:
                         list_subways.append([subway_line,subway_station,subway_station_distance])
                     # dict_subways = WriterJson().df_to_json(df_subways)
                     json_subways = json.dumps(list_subways, ensure_ascii=False)
-
                 except:
                     print("地址和交通有未知错误：", url)
                     json_subways = ''
@@ -348,12 +348,17 @@ class Ke:
                 # 小区最新成交
                 ##TODO：Debug line 310;read html table
                 try:
-                    complex_deals = driver.find_element_by_xpath("//div[@class='table']")
-                    # print(complex_deals.get_attribute('innerHTML'))
-                    complex_deals = pd.read_html('<table>' + complex_deals.get_attribute('innerHTML') + '</table>')
-                    # print(complex_deals)
-                    # complex_deals.to_json() 保存为json string
-                except:
+                    complex_deals = driver.find_element_by_xpath("//div[@class='table']").get_attribute('innerHTML')
+                    table = BeautifulSoup(complex_deals, 'lxml')
+                    record = []
+                    # 表格内容
+                    for tr in table.find_all("div", class_='tr')[1:]:
+                        cols = tr.find_all("div", class_='td')
+                        cols = [ele.text.strip() for ele in cols]
+                        record.append([ele for ele in cols if ele])  # Get rid of empty values
+                    complex_deals = pd.DataFrame(data=record, columns=['成交日期','居室','面积','租赁方式','出租价格']).to_json(orient='records', force_ascii=False)
+                except Exception as e:
+                    print (e)
                     complex_deals = ''
 
                 # 房源描述
@@ -370,6 +375,28 @@ class Ke:
                 # 房源链接
                 house_url = url
 
+                # 城市
+                city = driver.find_element_by_xpath("//div[@class='bread__nav w1150 bread__nav--empty']/p/a[1]").text[:-3]
+
+                # 城区
+                district = driver.find_element_by_xpath("//div[@class='bread__nav w1150 bread__nav--empty']/p/a[2]").text[:-2]
+
+                # 商圈
+                bizcircle = driver.find_element_by_xpath("//div[@class='bread__nav w1150 bread__nav--empty']/p/a[3]").text[:-2]
+
+                # 小区名称
+                complex = driver.find_element_by_xpath("//div[@class='bread__nav w1150 bread__nav--empty']/h1/a").text[:-2]
+
+                # 小区链接
+                complex_url = driver.find_element_by_xpath("//div[@class='bread__nav w1150 bread__nav--empty']/h1/a").get_attribute('href')
+
+                # 每平米房价
+                try:
+                    house_price_unit = round(house_price/house_area, 2)
+                except:
+                    print('无法计算每平米房价：', url)
+                    house_price_unit = ''
+
                 # 导出所有信息
                 dict_single = {'类型':rent_type,'标题':title,'上架时间':time_listed,'编号':house_code,'信息卡照片':duty_img,'信息卡号':duty_id,
                               '营业执照':'','经纪备案':'','房源图片列表':json_house_imgs,'价格':house_price,'特色标签列表':json_house_tags,
@@ -378,7 +405,9 @@ class Ke:
                               '车位':parking,'用电':electricity_type,'入住':check_in,'看房':reservation,'电梯':lift,'用水':water,'燃气':gas,
                               '电视':television, '冰箱':refrigerator,'洗衣机':washing_machine,'空调':air_conditioner,'热水器':water_heater,
                               '床':bed,'暖气':heating,'宽带':wifi,'衣柜':wardrobe,'天然气':natural_gas,'地址和交通':json_subways,
-                              '小区最新成交':complex_deals,'房源描述':house_description,'房源链接':house_url}
+                              '小区最新成交':complex_deals,'房源描述':house_description,'房源链接':house_url,
+                              '城市':city,'城区':district,'商圈':bizcircle,'小区名称':complex,'小区链接':complex_url,
+                              '每平米房价':house_price_unit}
                 return dict_single
 
         def gen_json(table_dict, keyword):
