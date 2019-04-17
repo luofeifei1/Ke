@@ -5,13 +5,58 @@
 
 __author__ = 'Qiao Zhang'
 
+import time
 import json
+import codecs
 import pandas as pd
 from selenium import webdriver
 from collections import OrderedDict
 from tqdm import tqdm
 
-from utils import WriterJson
+
+class WriterJson:
+    def __init__(self):
+        pass
+
+    # 将单个DataFrame保存为JSON，确保中文显示正确
+    def df_to_json(self, df, orient:str = 'table'):
+        return json.loads(df.to_json(orient, force_ascii=False))
+
+    # 将多个DataFrames组成的字典批量保存为JSON，确保中文显示正确:服务于类似`金融产品信息表`这样的包含多
+    def dfs_to_json(self, dic_dfs, orient:str = 'table'):
+        pass
+
+    # 将单个OrderedDict保存为JSON List
+    def odict_to_json(self, odict):
+        items = list(odict.items())
+        list_JSONed = []
+
+        # 把列表中的每个dict通过list append变成json
+        for i in range(len(items)):
+            try:
+                # 当内容为dict
+                try:
+                    list_JSONed.append([items[i][0],json.dumps(items[i][1], ensure_ascii=False)])
+                # 当内容为df
+                except:
+                    list_JSONed.append([items[i][0], json.loads(items[i][1].to_json(orient='table', force_ascii=False))])
+            except:
+                print(items[i][0] + '表为空，请检查。')
+        # 记录版本信息
+        list_JSONed.append({'version_date': time.strftime("%Y/%m/%d")})
+
+        return list_JSONed
+
+    # 从list_JSONed获取公司名称，用于设置JSON文件名称
+    def get_company_name_from_JSON(self, items_JSONed):
+        pass
+
+    # 将一个json list或者json dict存入文件
+    def write_json(self, json_list, file_name, indent=4, encoding='utf-8'):
+        f_out = codecs.open(file_name, 'w', encoding=encoding)
+        json_str = json.dumps(json_list, indent=indent, ensure_ascii=False)
+        f_out.write(json_str)
+        f_out.close()
 
 
 class Ke:
@@ -25,7 +70,7 @@ class Ke:
 
         要考虑整租/合租/公寓，省份，对话框关键字和依次的各项筛选条件。
 
-        TODO:1.将筛选条件打印在console里面
+        TODO:1.将筛选条件打印在console里面 2. 支持直接传入筛选条件的JSON文件（类似游戏读档），方便个性化项目
         :return:
         """
         # 目前爬取北京的全量租房
@@ -43,7 +88,7 @@ class Ke:
         driver.get(self.url)
         return driver
 
-    def ke_scraper_rent(self):
+    def ke_scraper_rent(self, export='csv'):
         def get_list_urls(driver):
             """
             获取当前筛选条件下的所有房源链接。
@@ -83,7 +128,7 @@ class Ke:
             list_urls_single = get_list_urls_single()
             list_urls += list_urls_single
             print('开始获取当前筛选条件下的所有房源页链接。')
-            for _ in tqdm(range(pages_number - 1)):
+            for _ in tqdm(range(pages_number - 1)): # 默认-1/97
                 change_page()
                 list_urls_single = get_list_urls_single()
                 list_urls += list_urls_single
@@ -97,6 +142,7 @@ class Ke:
             :return: df
             """
             driver.get(url)
+            ##TODO：支持对公寓房源的爬取。
             if 'apartment' in url:
                 pass
             else:
@@ -161,7 +207,10 @@ class Ke:
                 ##TODO
 
                 # 经纪人联系方式
-                broker_contact = driver.find_element_by_xpath("//p[@class='content__aside__list--bottom oneline']").text
+                try:
+                    broker_contact = driver.find_element_by_xpath("//p[@class='content__aside__list--bottom oneline']").text
+                except:
+                    broker_contact = ''
 
                 # 最短租期/最长租期:统一显示为天数，一年360天(防止12个月和365天天数不相等的情况)，一个月30天
                 rent_peroid = driver.find_element_by_xpath("//div[@class='content__article__info']/ul/li[5]").text[3:]
@@ -281,15 +330,20 @@ class Ke:
                 # 地址和交通
                 ##TODO:subway_line结构化优化：10号线 - 亮马桥，1号线,八通线 - 四惠，4号线大兴线 - 生物医药基地，s1线 - 上岸
                 try:
-                    df_subways = pd.DataFrame(columns=['subway_line','subway_station','subway_station_distance'])
+                    list_subways = []
+                    # df_subways = pd.DataFrame(columns=['subway_line','subway_station','subway_station_distance'])
                     for i in driver.find_elements_by_xpath("//div[@class='content__article__info4']/ul/li"):
                         subway_line = i.text[3:].split(' - ')[0]
                         subway_station = i.text.split(' - ')[1].split(' ')[0]
                         subway_station_distance = int(i.text.split(' - ')[1].split(' ')[1].split('m')[0])
-                        df_subways = df_subways.append({'subway_line':subway_line, 'subway_station':subway_station, 'subway_station_distance':subway_station_distance}, ignore_index=True)
-                    dict_subways = WriterJson().df_to_json(df_subways)
+                        # df_subways = df_subways.append({'subway_line':subway_line, 'subway_station':subway_station, 'subway_station_distance':subway_station_distance}, ignore_index=True)
+                        list_subways.append([subway_line,subway_station,subway_station_distance])
+                    # dict_subways = WriterJson().df_to_json(df_subways)
+                    json_subways = json.dumps(list_subways, ensure_ascii=False)
+
                 except:
-                    dict_subways = ''
+                    print("地址和交通有未知错误：", url)
+                    json_subways = ''
 
                 # 小区最新成交
                 ##TODO：Debug line 310;read html table
@@ -298,7 +352,7 @@ class Ke:
                     # print(complex_deals.get_attribute('innerHTML'))
                     complex_deals = pd.read_html('<table>' + complex_deals.get_attribute('innerHTML') + '</table>')
                     # print(complex_deals)
-                    complex_deals = WriterJson().df_to_json(complex_deals[0])
+                    # complex_deals.to_json() 保存为json string
                 except:
                     complex_deals = ''
 
@@ -306,7 +360,7 @@ class Ke:
                 ##TODO:检查有无超过一条描述的情况
                 if len(driver.find_elements_by_xpath("//div[@class='content__article__info3 ']/ul/li/p")) > 2:
                     house_description = ''
-                    print ("请调整子函数get_list_info的房源描述部分，有超过一条评论的情况需要全部考虑。（做成列表而不再是文本）")
+                    print ("请调整子函数get_list_info的房源描述部分，有超过一条评论的情况需要全部考虑。（做成列表而不再是文本）", url)
                 else:
                     try:
                         house_description = driver.find_element_by_xpath("//div[@class='content__article__info3 ']/ul/li/p[1]").text
@@ -323,7 +377,7 @@ class Ke:
                               '最短租期':rent_peroid_lower,'最长租期':rent_peroid_upper,'所在楼层':house_floor,'总楼层':house_total_floor,
                               '车位':parking,'用电':electricity_type,'入住':check_in,'看房':reservation,'电梯':lift,'用水':water,'燃气':gas,
                               '电视':television, '冰箱':refrigerator,'洗衣机':washing_machine,'空调':air_conditioner,'热水器':water_heater,
-                              '床':bed,'暖气':heating,'宽带':wifi,'衣柜':wardrobe,'天然气':natural_gas,'地址和交通':dict_subways,
+                              '床':bed,'暖气':heating,'宽带':wifi,'衣柜':wardrobe,'天然气':natural_gas,'地址和交通':json_subways,
                               '小区最新成交':complex_deals,'房源描述':house_description,'房源链接':house_url}
                 return dict_single
 
@@ -342,22 +396,51 @@ class Ke:
             WriterJson().write_json(json_list=list_json, file_name=keyword+'.json')
 
         def main(driver, keyword):
+            """
+            主运行函数。
+            :param driver:
+            :param keyword: 筛选条件，用于命名JSON文件。
+            :return: df
+            """
             # 获取符合当前筛选条件的所有房源链接
             list_urls = get_list_urls(driver=driver)
 
-            # 循环获取单房源信息并保存
+            # 循环获取单房源信息并保存为df
+            print("开始获取房源具体信息。")
             dict_all = {}
             list_sequence = 0
+            df = pd.DataFrame()
             for url in tqdm(list_urls):
-                dict_single = get_list_info(driver=driver, url=url)
-                dict_all[list_sequence] = dict_single
-                list_sequence += 1
+                if 'apartment' not in url:
+                    try:
+                        dict_single = get_list_info(driver=driver, url=url)
+                        dict_all[list_sequence] = dict_single
+                        df = df.append(pd.DataFrame(list(dict_all[list_sequence].items())).transpose(), ignore_index=True)
+                        list_sequence += 1
+                    except:
+                        print("有未知报错，请检查:", url)
+                        pass
 
-            # 保存列表为JSON
-            gen_json(table_dict=dict_all, keyword=keyword)
+            # 去除多余的表头
+            ##TODO:加快表头的处理速度。
+            df.drop_duplicates(inplace=True)
+            df = df.reset_index()
+            header = df.iloc[0]
+            df = df[1:]
+            df.columns = header
+
+            # 保存列表为JSON或csv（默认）
+            if export == 'csv':
+                df.to_csv(keyword+'.csv', encoding='gb18030')
+            elif export == 'json':
+                gen_json(table_dict=dict_all, keyword=keyword)
+            else:
+                print("请选择正确的输出格式，支持'xlsx'和'json'。")
 
             driver.quit()
-            return dict_all
+            return df
 
-        dict_all = main(self.driver, self.keyword)
-        return dict_all
+        df = main(self.driver, self.keyword)
+        return df
+
+
