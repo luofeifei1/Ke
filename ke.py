@@ -7,16 +7,19 @@ __author__ = 'Qiao Zhang'
 
 import time
 import re
+import json
 import pandas as pd
 from bs4 import BeautifulSoup
 from selenium import webdriver
 from collections import deque, OrderedDict
 from tqdm import tqdm
 
+from utils import WriterJson
+
 
 class Ke:
     def __init__(self):
-        self.url = self.generator_url()
+        self.url, self.keyword = self.generator_url()
         self.driver = self.login()
 
     def generator_url(self):
@@ -30,8 +33,9 @@ class Ke:
         """
         # 目前爬取北京的全量租房
         url = 'https://bj.zu.ke.com/zufang'
+        keyword = '全量'
 
-        return url
+        return url, keyword
 
     def login(self):
         """
@@ -103,36 +107,28 @@ class Ke:
                 try:
                     rent_type = driver.find_element_by_xpath("//p[@class='content__title']").text.split(' · ')[0]
                     title = driver.find_element_by_xpath("//p[@class='content__title']").text.split(' · ')[1]
-                    print (rent_type, title)
                 except:
                     rent_type = '未知'
                     title = driver.find_element_by_xpath("//p[@class='content__title']").text
-                    print (url,'租赁方式未知', title)
 
                 # 上架时间
                 time_listed = driver.find_element_by_xpath("//div[@class='content__subtitle']").text[7:17]
-                print (url, time_listed)
 
                 # 编号
                 house_code = driver.find_element_by_xpath("//div[@class='content__subtitle']/i[@class='house_code']").text[5:]
-                print (house_code)
 
                 # 信息卡照片：可能为空
                 ##TODO:是否有多个？有bug无法打开
                 try:
                     duty_img = driver.find_element_by_xpath("//div[@class='content__subtitle']/ul/li/div/img").get_attribute('src').split('!')[0]
-                    print (duty_img)
                 except:
                     duty_img = ''
-                    print ('无信息卡照片。')
 
                 # 信息卡号：可能为空
                 try:
                     duty_id = driver.find_element_by_xpath("//div[@class='content__subtitle']/ul/li/div/p").text.split('证件号码：')[1].stripe()
-                    print (duty_id)
                 except:
                     duty_id = ''
-                    print ('无信息卡号。')
 
                 # 营业执照
                 ##TODO
@@ -145,32 +141,30 @@ class Ke:
                     pass
 
                 # 房源照片列表
-                list_house_imgs = []
+                json_house_imgs = []
                 for i in driver.find_elements_by_xpath("//div[@class='content__article__slide__item']/img"):
-                    list_house_imgs.append(i.get_attribute('src'))
-                print (list_house_imgs)
+                    json_house_imgs.append(i.get_attribute('src'))
+                json_house_imgs = json.dumps(json_house_imgs, ensure_ascii=False)
 
                 # 价格
                 house_price = int(driver.find_element_by_xpath("//p[@class='content__aside--title']/span").text)
-                print(house_price)
 
                 # 特色标签列表
-                list_house_tags = []
+                json_house_tags = []
                 for i in driver.find_elements_by_xpath("//p[@class='content__aside--tags']/i"):
-                    list_house_tags.append(i.text)
-                print (list_house_tags)
+                    json_house_tags.append(i.text)
+                json_house_tags = json.dumps(json_house_tags, ensure_ascii=False)
+
                 # 户型、面积、朝向
                 house_type = driver.find_elements_by_xpath("//p[@class='content__article__table']/span")[1].text
                 house_area = int(driver.find_elements_by_xpath("//p[@class='content__article__table']/span")[2].text.split('㎡')[0])
                 house_orient = driver.find_elements_by_xpath("//p[@class='content__article__table']/span")[3].text.split('朝')[1]
-                print (house_type, house_area, house_orient)
 
                 # 经纪人姓名：可能为空
                 ##TODO
 
                 # 经纪人联系方式
                 broker_contact = driver.find_element_by_xpath("//p[@class='content__aside__list--bottom oneline']").text
-                print (broker_contact)
 
                 # 最短租期/最长租期:统一显示为天数，一年360天(防止12个月和365天天数不相等的情况)，一个月30天
                 rent_peroid = driver.find_element_by_xpath("//div[@class='content__article__info']/ul/li[5]").text[3:]
@@ -188,23 +182,18 @@ class Ke:
                 else:
                     rent_peroid_lower = rent_peroid
                     rent_peroid_upper = rent_peroid
-                print (rent_peroid_lower, rent_peroid_upper)
 
                 # 所在楼层
                 house_floor = driver.find_element_by_xpath("//div[@class='content__article__info']/ul/li[8]").text[3:].split('/')[0]
-                print(house_floor)
 
                 # 总楼层
                 house_total_floor = int(driver.find_element_by_xpath("//div[@class='content__article__info']/ul/li[8]").text[3:].split('/')[1].replace('层',''))
-                print(house_total_floor)
 
                 # 车位
                 parking = driver.find_element_by_xpath("//div[@class='content__article__info']/ul/li[11]").text[3:]
-                print(parking)
 
                 # 用电
                 electricity_type = driver.find_element_by_xpath("//div[@class='content__article__info']/ul/li[14]").text[3:]
-                print(electricity_type)
 
                 # 入住
                 check_in = driver.find_element_by_xpath("//div[@class='content__article__info']/ul/li[3]").text[3:]
@@ -294,26 +283,25 @@ class Ke:
 
                 # 地址和交通
                 ##TODO:subway_line结构化优化：10号线 - 亮马桥，1号线,八通线 - 四惠，4号线大兴线 - 生物医药基地，s1线 - 上岸
-                df_subways = pd.DataFrame(columns=['subway_line','subway_station','subway_station_distance'])
-                for i in driver.find_elements_by_xpath("//div[@class='content__article__info4']/ul/li"):
-                    print(i.text)
-                    subway_line = i.text[3:].split(' - ')[0]
-                    print(subway_line)
-                    subway_station = i.text.split(' - ')[1].split(' ')[0]
-                    print(subway_station)
-                    subway_station_distance = int(i.text.split(' - ')[1].split(' ')[1].split('m')[0])
-                    print(subway_station_distance)
-                    df_subways = df_subways.append({'subway_line':subway_line, 'subway_station':subway_station, 'subway_station_distance':subway_station_distance}, ignore_index=True)
-                dic_subways = df_subways.to_dict()
+                try:
+                    df_subways = pd.DataFrame(columns=['subway_line','subway_station','subway_station_distance'])
+                    for i in driver.find_elements_by_xpath("//div[@class='content__article__info4']/ul/li"):
+                        subway_line = i.text[3:].split(' - ')[0]
+                        subway_station = i.text.split(' - ')[1].split(' ')[0]
+                        subway_station_distance = int(i.text.split(' - ')[1].split(' ')[1].split('m')[0])
+                        df_subways = df_subways.append({'subway_line':subway_line, 'subway_station':subway_station, 'subway_station_distance':subway_station_distance}, ignore_index=True)
+                    dict_subways = WriterJson().df_to_json(df_subways)
+                except:
+                    dict_subways = ''
 
                 # 小区最新成交
                 ##TODO：Debug line 310;read html table
                 try:
                     complex_deals = driver.find_element_by_xpath("//div[@class='table']")
-                    print(complex_deals)
+                    # print(complex_deals.get_attribute('innerHTML'))
                     complex_deals = pd.read_html('<table>' + complex_deals.get_attribute('innerHTML') + '</table>')
-                    print(complex_deals)
-                    complex_deals = complex_deals[0].to_dict()
+                    # print(complex_deals)
+                    complex_deals = WriterJson().df_to_json(complex_deals[0])
                 except:
                     complex_deals = ''
 
@@ -331,34 +319,48 @@ class Ke:
                 # 房源链接
                 house_url = url
 
-                # 导入所有信息
-                global df_single
-                df_single = pd.DataFrame({'类型':rent_type,'标题':title,'上架时间':time_listed,'编号':house_code,'信息卡照片':duty_img,'信息卡号':duty_id,
-                                          '营业执照':'','经纪备案':'','房源图片列表':list_house_imgs,'价格':house_price,'特色标签列表':list_house_tags,
-                                          '户型':house_type,'面积':house_area,'朝向':house_orient,'经纪人姓名':'','经纪人联系方式':broker_contact,
-                                          '最短租期':rent_peroid_lower,'最长租期':rent_peroid_upper,'所在楼层':house_floor,'总楼层':house_total_floor,
-                                          '车位':parking,'用电':electricity_type,'入住':check_in,'看房':reservation,'电梯':lift,'用水':water,'燃气':gas,
-                                          '电视':television, '冰箱':refrigerator,'洗衣机':washing_machine,'空调':air_conditioner,'热水器':water_heater,
-                                          '床':bed,'暖气':heating,'宽带':wifi,'衣柜':wardrobe,'天然气':natural_gas,'地址和交通':dic_subways,
-                                          '小区最新成交':complex_deals,'房源描述':house_description,'房源链接':house_url})
+                # 导出所有信息
+                dict_single = {'类型':rent_type,'标题':title,'上架时间':time_listed,'编号':house_code,'信息卡照片':duty_img,'信息卡号':duty_id,
+                              '营业执照':'','经纪备案':'','房源图片列表':json_house_imgs,'价格':house_price,'特色标签列表':json_house_tags,
+                              '户型':house_type,'面积':house_area,'朝向':house_orient,'经纪人姓名':'','经纪人联系方式':broker_contact,
+                              '最短租期':rent_peroid_lower,'最长租期':rent_peroid_upper,'所在楼层':house_floor,'总楼层':house_total_floor,
+                              '车位':parking,'用电':electricity_type,'入住':check_in,'看房':reservation,'电梯':lift,'用水':water,'燃气':gas,
+                              '电视':television, '冰箱':refrigerator,'洗衣机':washing_machine,'空调':air_conditioner,'热水器':water_heater,
+                              '床':bed,'暖气':heating,'宽带':wifi,'衣柜':wardrobe,'天然气':natural_gas,'地址和交通':dict_subways,
+                              '小区最新成交':complex_deals,'房源描述':house_description,'房源链接':house_url}
+                return dict_single
 
-            return df_single
+        def gen_json(table_dict, keyword):
+            """
+            保存字典为JSON文件，用于数据存储。
+            :param table_dict: dict_all
+            :param keyword: 筛选条件
+            :return:
+            """
+            list_dic = []
+            for i in list(table_dict.keys()):
+                list_dic.append((i, table_dict[i]))
+            dic = OrderedDict(list_dic)
+            list_json = WriterJson().odict_to_json(dic)
+            WriterJson().write_json(json_list=list_json, file_name=keyword+'.json')
 
-        def main(driver):
+        def main(driver, keyword):
             # 获取符合当前筛选条件的所有房源链接
             list_urls = get_list_urls(driver=driver)
 
-            # 循环获取单房源信息
-            df = pd.DataFrame()
+            # 循环获取单房源信息并保存
+            dict_all = {}
+            list_sequence = 0
             for url in tqdm(list_urls):
-                df_single = get_list_info(driver=driver, url=url)
-                df = df.append(df_single)
+                dict_single = get_list_info(driver=driver, url=url)
+                dict_all[list_sequence] = dict_single
+                list_sequence += 1
 
-            # 保存列表
-            df.to_csv('rent.csv', encoding='gb18030')
+            # 保存列表为JSON
+            gen_json(table_dict=dict_all, keyword=keyword)
 
             driver.quit()
-            return df
+            return dict_all
 
-        df = main(self.driver)
-        return df
+        dict_all = main(self.driver, self.keyword)
+        return dict_all
