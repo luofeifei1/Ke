@@ -71,12 +71,20 @@ class Ke:
 
         要考虑整租/合租/公寓，省份，对话框关键字和依次的各项筛选条件。
 
-        TODO:1.将筛选条件打印在console里面 2. 支持直接传入筛选条件的JSON文件（类似游戏读档），方便个性化项目
+        TODO:1.将筛选条件打印在console里面 2. 支持直接传入筛选条件的JSON文件（类似游戏读档），方便个性化项目 3. 建立数据字典
         :return:
         """
-        # 目前爬取北京的全量租房
+
+        # 默认：目前爬取北京的全量租房
         url = 'https://bj.zu.ke.com/zufang'
         keyword = '全量'
+
+        # 定制：传入需求，匹配对应的单个或多个URL
+
+        # 北京朝阳区三元桥整租
+        ##TODO：处理当房源数量过少的时候无“下一页”的问题。
+        url = 'https://bj.zu.ke.com/zufang/sanyuanqiao/rt200600000001/'
+        keyword = '北京朝阳区三元桥整租'
 
         return url, keyword
 
@@ -128,7 +136,7 @@ class Ke:
             list_urls = []
             list_urls_single = get_list_urls_single()
             list_urls += list_urls_single
-            print('开始获取当前筛选条件下的所有房源页链接。')
+            print('开始获取当前筛选条件下的所有房源页链接。Windows平台下，请勿最小化浏览器。')
             for _ in tqdm(range(pages_number - 1)): # 默认-1/97
                 change_page()
                 list_urls_single = get_list_urls_single()
@@ -223,7 +231,7 @@ class Ke:
                         rent_peroid_lower = int(rent_peroid.split('~')[0])*360
                         rent_peroid_upper = int(rent_peroid.split('~')[1].split('年')[0])*360
                     else:
-                        print (rent_peroid)
+                        print ("请手工检查租期：", rent_peroid, url)
                         rent_peroid_lower = rent_peroid
                         rent_peroid_upper = rent_peroid
                 else:
@@ -328,25 +336,24 @@ class Ke:
                 else:
                     natural_gas = 1
 
-                # 地址和交通
-                ##TODO:subway_line结构化优化：10号线 - 亮马桥，1号线,八通线 - 四惠，4号线大兴线 - 生物医药基地，s1线 - 上岸
+                # 地址和交通，地铁便利性
+                accessibility_subway = 0
                 try:
                     list_subways = []
-                    # df_subways = pd.DataFrame(columns=['subway_line','subway_station','subway_station_distance'])
                     for i in driver.find_elements_by_xpath("//div[@class='content__article__info4']/ul/li"):
                         subway_line = i.text[3:].split(' - ')[0]
                         subway_station = i.text.split(' - ')[1].split(' ')[0]
                         subway_station_distance = int(i.text.split(' - ')[1].split(' ')[1].split('m')[0])
-                        # df_subways = df_subways.append({'subway_line':subway_line, 'subway_station':subway_station, 'subway_station_distance':subway_station_distance}, ignore_index=True)
                         list_subways.append([subway_line,subway_station,subway_station_distance])
-                    # dict_subways = WriterJson().df_to_json(df_subways)
+
+                        if subway_station_distance < 300:
+                            accessibility_subway = 1
                     json_subways = json.dumps(list_subways, ensure_ascii=False)
                 except:
                     print("地址和交通有未知错误：", url)
                     json_subways = ''
 
                 # 小区最新成交
-                ##TODO：Debug line 310;read html table
                 try:
                     complex_deals = driver.find_element_by_xpath("//div[@class='table']").get_attribute('innerHTML')
                     table = BeautifulSoup(complex_deals, 'lxml')
@@ -357,12 +364,11 @@ class Ke:
                         cols = [ele.text.strip() for ele in cols]
                         record.append([ele for ele in cols if ele])  # Get rid of empty values
                     complex_deals = pd.DataFrame(data=record, columns=['成交日期','居室','面积','租赁方式','出租价格']).to_json(orient='records', force_ascii=False)
-                except Exception as e:
-                    print (e)
+                except:
+                    print ("无小区最新成交信息：", url)
                     complex_deals = ''
 
                 # 房源描述
-                ##TODO:检查有无超过一条描述的情况
                 if len(driver.find_elements_by_xpath("//div[@class='content__article__info3 ']/ul/li/p")) > 2:
                     house_description = ''
                     print ("请调整子函数get_list_info的房源描述部分，有超过一条评论的情况需要全部考虑。（做成列表而不再是文本）", url)
@@ -397,6 +403,19 @@ class Ke:
                     print('无法计算每平米房价：', url)
                     house_price_unit = ''
 
+                # 经纪人品牌
+                broker_brand = driver.find_element_by_xpath("//div[@class='content__aside fr']/ul[@class='content__aside__list']/li/p").text
+                if ' 经纪人' in broker_brand:
+                    broker_brand = broker_brand[:-4]
+
+                # 上下楼便利性：无障碍性，楼层与电梯的合成项
+                if lift == 1:
+                    accessibility_floor = 1
+                elif lift == 0 and house_floor <= 3:
+                    accessibility_floor = 1
+                else:
+                    accessibility_floor = 0
+
                 # 导出所有信息
                 dict_single = {'类型':rent_type,'标题':title,'上架时间':time_listed,'编号':house_code,'信息卡照片':duty_img,'信息卡号':duty_id,
                               '营业执照':'','经纪备案':'','房源图片列表':json_house_imgs,'价格':house_price,'特色标签列表':json_house_tags,
@@ -407,7 +426,8 @@ class Ke:
                               '床':bed,'暖气':heating,'宽带':wifi,'衣柜':wardrobe,'天然气':natural_gas,'地址和交通':json_subways,
                               '小区最新成交':complex_deals,'房源描述':house_description,'房源链接':house_url,
                               '城市':city,'城区':district,'商圈':bizcircle,'小区名称':complex,'小区链接':complex_url,
-                              '每平米房价':house_price_unit}
+                              '每平米房价':house_price_unit, '经纪人品牌':broker_brand, '上下楼便利性':accessibility_floor,
+                              '地铁便利性':accessibility_subway}
                 return dict_single
 
         def gen_json(table_dict, keyword):
@@ -471,5 +491,3 @@ class Ke:
 
         df = main(self.driver, self.keyword)
         return df
-
-
