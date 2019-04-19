@@ -465,8 +465,11 @@ class Ke:
                 df.to_csv(keyword+'.csv', encoding='gb18030')
             elif export == 'json':
                 gen_json(table_dict=dict_all, keyword=keyword)
+            elif export is None:
+                pass
             else:
                 print("请选择正确的输出格式，支持'xlsx'和'json'。")
+                pass
 
             driver.quit()
             return df
