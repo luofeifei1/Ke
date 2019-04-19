@@ -12,5 +12,5 @@
 from ke import Ke
 df = Ke().ke_scraper_rent(export='json')
 ```
-运行后将指定筛选条件下的爬取结果返回为pandas.DataFrame并保存为JSON文件，请参考`全量.json`。也支持保存为'csv'格式。
+运行后将指定筛选条件下的爬取结果返回为pandas.DataFrame并保存为JSON文件，请参考`全量.json`。也支持保存为'csv'格式或不保存（None）。
 
