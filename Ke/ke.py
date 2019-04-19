@@ -123,6 +123,9 @@ class Ke:
                 change_page()
                 list_urls_single = get_list_urls_single()
                 list_urls += list_urls_single
+
+            # 去除重复链接
+            list_urls = list(set(list_urls))
             return list_urls
 
         def get_list_info(driver, url):
@@ -476,3 +479,8 @@ class Ke:
 
         df = main(self.driver, self.keyword)
         return df
+
+
+if __name__ == "__main__":
+    df = Ke(url='https://bj.zu.ke.com/zufang/dongcheng/rt200600000001rp2rp3rp4/#contentList',
+            keyword='北京东城整租').ke_scraper_rent(export=None)
