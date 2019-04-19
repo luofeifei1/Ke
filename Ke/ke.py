@@ -61,32 +61,10 @@ class WriterJson:
 
 
 class Ke:
-    def __init__(self):
-        self.url, self.keyword = self.generator_url()
+
+    def __init__(self, url, keyword):
+        self.url, self.keyword = url, keyword
         self.driver = self.login()
-
-    def generator_url(self):
-        """
-        根据指定的爬取类型，获得正确的URL。贝壳网采用POST方式显示页面变化。
-
-        要考虑整租/合租/公寓，省份，对话框关键字和依次的各项筛选条件。
-
-        TODO:1.将筛选条件打印在console里面 2. 支持直接传入筛选条件的JSON文件（类似游戏读档），方便个性化项目 3. 建立数据字典
-        :return:
-        """
-
-        # 默认：目前爬取北京的全量租房
-        url = 'https://bj.zu.ke.com/zufang'
-        keyword = '全量'
-
-        # 定制：传入需求，匹配对应的单个或多个URL
-
-        # 北京朝阳区三元桥整租
-        ##TODO：处理当房源数量过少的时候无“下一页”的问题。
-        url = 'https://bj.zu.ke.com/zufang/sanyuanqiao/rt200600000001/'
-        keyword = '北京朝阳区三元桥整租'
-
-        return url, keyword
 
     def login(self):
         """
@@ -110,7 +88,7 @@ class Ke:
                 :param driver:
                 :return: pages_number
                 """
-                pages_number = int(driver.find_elements_by_xpath("//div[@class='content__pg']/a")[-2].text)
+                pages_number = int(driver.find_element_by_xpath("//div[@class='content__pg']").get_attribute('data-totalpage'))
                 return pages_number
 
             def change_page():
@@ -119,7 +97,11 @@ class Ke:
                 :param driver:
                 :return:
                 """
-                driver.find_element_by_link_text('下一页').click()
+                try:
+                    driver.find_element_by_link_text('下一页').click()
+                except:
+                    page_number_current = int(driver.find_element_by_xpath("//div[@class='content__pg']").get_attribute('data-curpage'))
+                    driver.find_element_by_xpath("//div[@class='content__pg']/a[@data-page='{}']".format(page_number_current+1)).click()
 
             def get_list_urls_single():
                 """
