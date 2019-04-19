@@ -394,12 +394,16 @@ class Ke:
                     broker_brand = broker_brand[:-4]
 
                 # 上下楼便利性：无障碍性，楼层与电梯的合成项
+                ##TODO:debug-目前上下楼便利性全都是0
+                accessibility_floor = 0
                 if lift == 1:
                     accessibility_floor = 1
                 elif lift == 0 and house_floor <= 3:
                     accessibility_floor = 1
+                elif lift == 0 and house_floor == '低楼层':
+                    accessibility_floor = 1
                 else:
-                    accessibility_floor = 0
+                    pass
 
                 # 导出所有信息
                 dict_single = {'类型':rent_type,'标题':title,'上架时间':time_listed,'编号':house_code,'信息卡照片':duty_img,'信息卡号':duty_id,
