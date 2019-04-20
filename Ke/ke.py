@@ -484,7 +484,43 @@ class Ke:
         df = main(self.driver, self.keyword)
         return df
 
+    def ke_scraper_bizcircles(self, export='csv'):
+        """
+        输入获取指定城市的商圈信息。贝壳网的租房和买房（新房/二手房）使用同一商圈信息。默认下爬取北京市。
+        :return: 一个包含商圈信息的pandas.DataFrame
+        """
+        df_bizcircles = pd.DataFrame(columns=['bizcircle_name', 'bizcircle_url', 'district'])
+
+        for i in tqdm(range(len(self.driver.find_elements_by_xpath("//li[@data-type='district']")[1:]))):
+            self.driver.find_element_by_xpath("//li[@data-type='district'][{}]".format(i+1)).click()
+
+            # 获取指定城区的所有商圈
+            df_bizcircle = pd.DataFrame(columns=['bizcircle_name', 'bizcircle_url', 'district'])
+
+            for bizcircle in self.driver.find_elements_by_xpath("//li[@data-type='bizcircle']")[1:]:
+                bizcircle_url = bizcircle.find_element_by_xpath(".//a").get_attribute('href')
+                bizcircle_name = bizcircle.text.strip()
+                df_bizcircle = df_bizcircle.append(
+                    {'bizcircle_name': bizcircle_name, 'bizcircle_url': bizcircle_url}, ignore_index=True)
+
+            df_bizcircle['district'] = self.driver.find_element_by_xpath("//li[@data-type='district'][{}+1]/a".format(i)).text
+            df_bizcircles = df_bizcircles.append(df_bizcircle, ignore_index=True)
+
+        # 保存列表为JSON或csv（默认）
+        if export == 'csv':
+            df_bizcircles.to_csv(self.keyword + '.csv', encoding='gb18030')
+        elif export == 'json':
+            df_bizcircles.to_json(self.keyword + '.json', force_ascii=False)
+        elif export is None:
+            pass
+        else:
+            print("请选择正确的输出格式，支持'xlsx'和'json'。")
+            pass
+
+        self.driver.quit()
+        return df_bizcircles
+
 
 if __name__ == "__main__":
-    df = Ke(url='https://bj.zu.ke.com/zufang/dongcheng/rt200600000001rp2rp3rp4/#contentList',
-            keyword='北京东城整租').ke_scraper_rent(export=None)
+    df = Ke(url='https://bj.zu.ke.com/zufang/',
+            keyword='北京商圈').ke_scraper_bizcircles(export='csv')
