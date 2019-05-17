@@ -9,10 +9,12 @@ import time
 import json
 import codecs
 import pandas as pd
+import pyautogui
 from selenium import webdriver
 from bs4 import BeautifulSoup
 from collections import OrderedDict
 from tqdm import tqdm
+
 
 
 class WriterJson:
@@ -62,8 +64,8 @@ class WriterJson:
 
 class Ke:
 
-    def __init__(self, url, keyword):
-        self.url, self.keyword = url, keyword
+    def __init__(self, username=None, password=None):
+        self.username, self.password = username, password
         self.driver = self.login()
 
     def login(self):
@@ -71,11 +73,19 @@ class Ke:
         登录程序，暂时不需要输入用户密码就可以登录。
         :return:
         """
+        #TODO：登录程序debug，登录按钮无法点击
         driver = webdriver.Chrome()
-        driver.get(self.url)
+
+        # driver.get('https://bj.zu.ke.com/zufang/')
+        # driver.find_element_by_xpath("//*[@id='top']/li[12]/span/span[1]").click()
+        # driver.find_element_by_xpath("//*[@id='con_login_user_tel']/form/ul/li[8]/a").click()
+        # driver.find_element_by_xpath("//*[@id='con_login_user']/form/ul/li[1]/input").send_keys(self.username)
+        # driver.find_element_by_xpath("//*[@id='con_login_user']/form/ul/li[2]/input").send_keys(self.password)
+        # time.sleep(1)
+        # driver.find_element_by_xpath("//*[@id='con_login_user']/form/ul/li[7]/a").click()
         return driver
 
-    def ke_scraper_rent(self, export='csv'):
+    def ke_scraper_rent(self, url, keyword=None, export='csv'):
         def get_list_urls(driver):
             """
             获取当前筛选条件下的所有房源链接。
@@ -326,6 +336,7 @@ class Ke:
                     natural_gas = 1
 
                 # 地址和交通，地铁便利性
+                ##TODO:地铁便利性的筛选标准，距任一地铁站的距离有小于1000m的
                 accessibility_subway = 0
                 try:
                     list_subways = []
@@ -335,7 +346,7 @@ class Ke:
                         subway_station_distance = int(i.text.split(' - ')[1].split(' ')[1].split('m')[0])
                         list_subways.append([subway_line,subway_station,subway_station_distance])
 
-                        if subway_station_distance < 300:
+                        if subway_station_distance < 1000:
                             accessibility_subway = 1
                     json_subways = json.dumps(list_subways, ensure_ascii=False)
                 except:
@@ -486,14 +497,17 @@ class Ke:
             driver.quit()
             return df
 
-        df = main(self.driver, self.keyword)
+        self.driver.get(url)
+        df = main(self.driver, keyword)
         return df
 
-    def ke_scraper_bizcircles(self, export='csv'):
+    def ke_scraper_bizcircles(self, url, keyword=None, export='csv'):
         """
         输入获取指定城市的商圈信息。贝壳网的租房和买房（新房/二手房）使用同一商圈信息。默认下爬取北京市。
         :return: 一个包含商圈信息的pandas.DataFrame
         """
+        self.driver.get(url)
+
         df_bizcircles = pd.DataFrame(columns=['bizcircle_name', 'bizcircle_url', 'district'])
 
         for i in tqdm(range(len(self.driver.find_elements_by_xpath("//li[@data-type='district']")[1:]))):
@@ -513,9 +527,9 @@ class Ke:
 
         # 保存列表为JSON或csv（默认）
         if export == 'csv':
-            df_bizcircles.to_csv(self.keyword + '.csv', encoding='gb18030')
+            df_bizcircles.to_csv(keyword + '.csv', encoding='gb18030')
         elif export == 'json':
-            df_bizcircles.to_json(self.keyword + '.json', force_ascii=False)
+            df_bizcircles.to_json(keyword + '.json', force_ascii=False)
         elif export is None:
             pass
         else:
@@ -525,9 +539,28 @@ class Ke:
         self.driver.quit()
         return df_bizcircles
 
+    def ke_messenger(self, url, content):
+        """
+        输入指定房源信息页，输出指定文本内容到关于该房源的联系对话框。
+
+        1, 锁定“在线咨询”按钮，并点击
+        2. 跳转点击到对话框
+        3. 输入指定文本内容
+        :return:
+        """
+        #TODO:登录问题未解决，无法使用messenger。
+        self.driver.get(url)
+        time.sleep(5)
+        print('开始1')
+        self.driver.find_element_by_xpath("//*[@id='aside']/ul[2]/li/div[2]/span").click()
+        # buttonx, buttony = pyautogui.locateCenterOnScreen('在线咨询.png')
+        # pyautogui.click(buttonx, buttony)
+        time.sleep(5)
+        print('开始2')
+        self.driver.find_element_by_xpath("/html/body/div[5]/div[1]/div[2]/div[2]/div[3]/div[1]/textarea").send_keys(content)
+
 
 if __name__ == "__main__":
-    # df = Ke(url='https://bj.zu.ke.com/zufang/',
-    #         keyword='北京商圈').ke_scraper_rent(export='csv')
-    df = Ke(url='https://bj.zu.ke.com/zufang/sanlitun/l0',
-            keyword='北京三里屯').ke_scraper_rent(export='csv')
+    # df_bizcircles = Ke(username='17810375258', password='abcd1234').ke_scraper_bizcircles(url='https://bj.zu.ke.com/zufang/', keyword='北京商圈', export='csv')
+    df = Ke(username='17810375258', password='abcd1234').ke_scraper_rent(url='https://bj.zu.ke.com/zufang/sanlitun/l0', keyword='北京三里屯', export='csv')
+    # driver = Ke(username='17810375258', password='abcd1234').ke_messenger(url='https://bj.zu.ke.com/zufang/BJ2221643218612142080.html?h=BJ2221643218612142080&t=default&click_position=0&unique_id=dd54f946-724f-49c2-8a0a-dff8f8844c8ezufangsanlitunrt200600000001l0l1l21558063862371', content='Hi')
