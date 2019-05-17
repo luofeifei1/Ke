@@ -242,10 +242,10 @@ class Ke:
                 reservation = driver.find_element_by_xpath("//div[@class='content__article__info']/ul/li[6]").text[3:]
 
                 # 电梯
-                lift= driver.find_element_by_xpath("//div[@class='content__article__info']/ul/li[9]").text[3:]
+                lift = driver.find_element_by_xpath("//div[@class='content__article__info']/ul/li[9]").text[3:]
 
                 # 用水
-                water= driver.find_element_by_xpath("//div[@class='content__article__info']/ul/li[12]").text[3:]
+                water = driver.find_element_by_xpath("//div[@class='content__article__info']/ul/li[12]").text[3:]
 
                 # 燃气
                 ##TODO:和下面的天然气有什么区别？
@@ -394,11 +394,10 @@ class Ke:
                     broker_brand = broker_brand[:-4]
 
                 # 上下楼便利性：无障碍性，楼层与电梯的合成项
-                ##TODO:debug-目前上下楼便利性全都是0
                 accessibility_floor = 0
-                if lift == 1:
+                if lift == '有':
                     accessibility_floor = 1
-                elif lift == 0 and house_floor <= 3:
+                elif lift == '无' and house_floor <= '3':
                     accessibility_floor = 1
                 elif lift == 0 and house_floor == '低楼层':
                     accessibility_floor = 1
@@ -522,5 +521,7 @@ class Ke:
 
 
 if __name__ == "__main__":
-    df = Ke(url='https://bj.zu.ke.com/zufang/',
-            keyword='北京商圈').ke_scraper_bizcircles(export='csv')
+    # df = Ke(url='https://bj.zu.ke.com/zufang/',
+    #         keyword='北京商圈').ke_scraper_rent(export='csv')
+    df = Ke(url='https://bj.zu.ke.com/zufang/sanlitun/l0',
+            keyword='北京三里屯').ke_scraper_rent(export='csv')
