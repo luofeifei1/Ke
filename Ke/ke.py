@@ -141,12 +141,16 @@ class Ke:
                 pass
             else:
                 # 类型/标题：可能为空，导致标题的爬取报错
-                try:
-                    rent_type = driver.find_element_by_xpath("//p[@class='content__title']").text.split(' · ')[0]
-                    title = driver.find_element_by_xpath("//p[@class='content__title']").text.split(' · ')[1]
-                except:
+                # try:
+                #     rent_type = driver.find_element_by_xpath("//p[@class='content__title']").text.split(' · ')[0]
+                #     title = driver.find_element_by_xpath("//p[@class='content__title']").text.split(' · ')[1]
+                # except:
+                #     rent_type = '未知'
+                #     title = driver.find_element_by_xpath("//p[@class='content__title']").text
+                rent_type = driver.find_elements_by_xpath("//p[@class='content__article__table']/span")[0].text
+                title = driver.find_element_by_xpath("//p[@class='content__title']").text
+                if '未知' in rent_type:
                     rent_type = '未知'
-                    title = driver.find_element_by_xpath("//p[@class='content__title']").text
 
                 # 上架时间
                 time_listed = driver.find_element_by_xpath("//div[@class='content__subtitle']").text[7:17]
@@ -392,6 +396,8 @@ class Ke:
                 broker_brand = driver.find_element_by_xpath("//div[@class='content__aside fr']/ul[@class='content__aside__list']/li/p").text
                 if ' 经纪人' in broker_brand:
                     broker_brand = broker_brand[:-4]
+                if '管家' in broker_brand:
+                    broker_brand = broker_brand[:-3]
 
                 # 上下楼便利性：无障碍性，楼层与电梯的合成项
                 accessibility_floor = 0
